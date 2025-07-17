@@ -1,0 +1,189 @@
+-- KeyGuardian Setup
+local KeyGuardianLibrary = loadstring(game:HttpGet("https://cdn.keyguardian.org/library/v1.0.0.lua"))()
+local trueData = "8174864eabc8416e8e895447174533ec"
+local falseData = "25109d22cba340a0b2b3e438a53ce4e2"
+
+KeyGuardianLibrary.Set({
+    publicToken = "114ab22791574a758e6f84dcdb70e8ba",
+    privateToken = "6c1ccdd2d6194a77b87da044073dffec",
+    trueData = trueData,
+    falseData = falseData,
+})
+
+-- Safe key storage via flags (fake setting name)
+local function saveKeyToMemory(key)
+    pcall(function() setfflag("Remembered_Key", key) end)
+end
+
+local function getSavedKey()
+    local success, value = pcall(function() return getfflag("Remembered_Key") end)
+    if success and value and value ~= "" then
+        return value
+    end
+end
+
+local function clearSavedKey()
+    pcall(function() setfflag("Remembered_Key", "") end)
+end
+
+-- UI Elements
+local TweenService = game:GetService("TweenService")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.Size = UDim2.new(0, 360, 0, 350)
+Frame.Position = UDim2.new(0.35, 0, 0.35, 0)
+Frame.Active = true
+Frame.Draggable = true
+Frame.BorderSizePixel = 0
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Text = "🔐 Key System"
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 22
+Title.TextColor3 = Color3.fromRGB(85, 170, 255)
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0.12, 0)
+
+local CloseButton = Instance.new("TextButton", Frame)
+CloseButton.Text = "✖"
+CloseButton.Font = Enum.Font.SourceSansBold
+CloseButton.TextSize = 18
+CloseButton.BackgroundTransparency = 1
+CloseButton.Size = UDim2.new(0, 25, 0, 25)
+CloseButton.Position = UDim2.new(1, -30, 0, 5)
+CloseButton.TextColor3 = Color3.new(1, 1, 1)
+
+local AnimatedKey = Instance.new("TextLabel", Frame)
+AnimatedKey.Text = "Waiting for Key"
+AnimatedKey.Font = Enum.Font.SourceSans
+AnimatedKey.TextSize = 16
+AnimatedKey.TextColor3 = Color3.fromRGB(200, 200, 200)
+AnimatedKey.BackgroundTransparency = 1
+AnimatedKey.Position = UDim2.new(0, 0, 0.14, 0)
+AnimatedKey.Size = UDim2.new(1, 0, 0.08, 0)
+
+local TextBox = Instance.new("TextBox", Frame)
+TextBox.PlaceholderText = "Enter Key Here"
+TextBox.Text = getSavedKey() or ""
+TextBox.Font = Enum.Font.SourceSans
+TextBox.TextSize = 16
+TextBox.TextColor3 = Color3.new(1, 1, 1)
+TextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TextBox.Position = UDim2.new(0.1, 0, 0.24, 0)
+TextBox.Size = UDim2.new(0.8, 0, 0.12, 0)
+Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0, 6)
+
+-- Remember Me Checkbox
+local RememberCheckbox = Instance.new("TextButton", Frame)
+RememberCheckbox.Text = "☐ Remember Me"
+RememberCheckbox.Font = Enum.Font.SourceSans
+RememberCheckbox.TextSize = 16
+RememberCheckbox.TextColor3 = Color3.fromRGB(200, 200, 200)
+RememberCheckbox.BackgroundTransparency = 1
+RememberCheckbox.Position = UDim2.new(0.1, 0, 0.38, 0)
+RememberCheckbox.Size = UDim2.new(0.8, 0, 0.06, 0)
+
+local rememberEnabled = false
+RememberCheckbox.MouseButton1Click:Connect(function()
+    rememberEnabled = not rememberEnabled
+    RememberCheckbox.Text = rememberEnabled and "☑ Remember Me" or "☐ Remember Me"
+end)
+
+local GetKeyButton = Instance.new("TextButton", Frame)
+GetKeyButton.Text = "🔗 Get Key"
+GetKeyButton.Font = Enum.Font.SourceSansBold
+GetKeyButton.TextSize = 16
+GetKeyButton.TextColor3 = Color3.new(1, 1, 1)
+GetKeyButton.BackgroundColor3 = Color3.fromRGB(85, 170, 255)
+GetKeyButton.Position = UDim2.new(0.25, 0, 0.5, 0)
+GetKeyButton.Size = UDim2.new(0.5, 0, 0.12, 0)
+Instance.new("UICorner", GetKeyButton).CornerRadius = UDim.new(0, 6)
+
+local ValidateButton = Instance.new("TextButton", Frame)
+ValidateButton.Text = "✅ Validate Key"
+ValidateButton.Font = Enum.Font.SourceSansBold
+ValidateButton.TextSize = 16
+ValidateButton.TextColor3 = Color3.new(1, 1, 1)
+ValidateButton.BackgroundColor3 = Color3.fromRGB(85, 170, 255)
+ValidateButton.Position = UDim2.new(0.25, 0, 0.67, 0)
+ValidateButton.Size = UDim2.new(0.5, 0, 0.12, 0)
+Instance.new("UICorner", ValidateButton).CornerRadius = UDim.new(0, 6)
+
+local Notification = Instance.new("TextLabel", ScreenGui)
+Notification.BackgroundTransparency = 1
+Notification.Position = UDim2.new(0.5, -150, 0.15, 0)
+Notification.Size = UDim2.new(0, 300, 0, 40)
+Notification.Font = Enum.Font.SourceSansBold
+Notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+Notification.TextSize = 18
+Notification.TextWrapped = true
+Notification.Text = ""
+Notification.Visible = false
+
+-- Notification Function
+local notificationRunning = false
+local function showNotification(text, color)
+    if notificationRunning then return end
+    notificationRunning = true
+    Notification.Text = text
+    Notification.TextColor3 = color
+    Notification.Visible = true
+    wait(2.5)
+    Notification.Visible = false
+    notificationRunning = false
+end
+
+-- Animate Key Text
+task.spawn(function()
+    while Frame.Parent do
+        for i = 0, 3 do
+            AnimatedKey.Text = "Waiting for Key" .. string.rep(".", i)
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Validate Key
+ValidateButton.MouseButton1Click:Connect(function()
+    local key = TextBox.Text
+    if key == "" then
+        return showNotification("⚠️ Enter a key!", Color3.fromRGB(255, 85, 85))
+    end
+
+    local success, result = pcall(function()
+        return KeyGuardianLibrary.validateDefaultKey(key)
+    end)
+
+    if success and result == trueData then
+        showNotification("✅ Key Valid!", Color3.fromRGB(85, 255, 85))
+        if rememberEnabled then
+            saveKeyToMemory(key)
+        end
+        Frame:Destroy()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/jhondrheydacudao/Scripts/refs/heads/main/weird%20gun%20game"))()
+    else
+        showNotification("❌ Invalid Key.", Color3.fromRGB(255, 85, 85))
+        clearSavedKey()
+    end
+end)
+
+-- Get Key
+GetKeyButton.MouseButton1Click:Connect(function()
+    local url = KeyGuardianLibrary.getLink()
+    if setclipboard then
+        setclipboard(url)
+        showNotification("📋 Link copied to clipboard!", Color3.fromRGB(85, 170, 255))
+    else
+        showNotification("⚠️ Unable to copy link!", Color3.fromRGB(255, 170, 0))
+    end
+end)
+
+-- Close UI
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
